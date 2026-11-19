@@ -33,6 +33,7 @@ services:
       ConnectionStrings__Metadata: "Host=metadata-db;Port=5432;Database=pgcontrol;Username=pgcontrol;Password=pgcontrolpass"
       Jwt__Key: "dev-only-key-change-in-prod-min-32-chars!!"
       Jwt__Issuer: "pg-control"
+      DOCKER_API_VERSION: "1.41"
     depends_on:
       metadata-db:
         condition: service_healthy
@@ -40,6 +41,9 @@ services:
       - "5000:5000"
     networks:
       - pgcontrol
+      - ha-network
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
 
   frontend:
     build:
@@ -57,6 +61,9 @@ services:
 networks:
   pgcontrol:
     driver: bridge
+  ha-network:
+    external: true
+    name: pg-ha-lab-step2_pgnet
 
 volumes:
   pgcontrol_metadata_data:

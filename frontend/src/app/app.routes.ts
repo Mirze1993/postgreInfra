@@ -21,5 +21,11 @@ export const routes: Routes = [
       import('./pages/dashboard/dashboard.component').then((m) => m.DashboardComponent),
     canActivate: [authGuard],
   },
+  {
+    path: 'backups',
+    loadComponent: () =>
+      import('./pages/backups/backups.component').then((m) => m.BackupsComponent),
+    canActivate: [authGuard],
+  },
   { path: '**', redirectTo: '/dashboard' },
 ];

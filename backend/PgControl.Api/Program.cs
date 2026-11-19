@@ -1,3 +1,4 @@
+using PgControl.Api.Services;
 using Serilog;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -12,7 +13,9 @@ builder.Host.UseSerilog((ctx, lc) => lc
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
+builder.Services.AddHttpClient<PatroniService>();
+builder.Services.AddScoped<PostgresMetricsService>();
+builder.Services.AddScoped<PgBackRestService>();
 builder.Services.AddHealthChecks();
 
 // CORS — Angular dev server üçün
