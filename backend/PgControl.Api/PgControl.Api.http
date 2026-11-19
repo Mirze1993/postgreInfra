@@ -1,0 +1,6 @@
+@PgControl.Api_HostAddress = http://localhost:5220
+
+GET {{PgControl.Api_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

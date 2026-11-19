@@ -1,0 +1,62 @@
+name: pg-control-plane
+
+services:
+  metadata-db:
+    image: postgres:18
+    container_name: pgcontrol_metadata
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: pgcontrol
+      POSTGRES_PASSWORD: pgcontrolpass
+      POSTGRES_DB: pgcontrol
+    volumes:
+      - pgcontrol_metadata_data:/var/lib/postgresql
+      - ./docker/metadata-db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    ports:
+      - "5433:5432"
+    networks:
+      - pgcontrol
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U pgcontrol"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend/PgControl.Api
+      dockerfile: Dockerfile
+    container_name: pgcontrol_backend
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Metadata: "Host=metadata-db;Port=5432;Database=pgcontrol;Username=pgcontrol;Password=pgcontrolpass"
+      Jwt__Key: "dev-only-key-change-in-prod-min-32-chars!!"
+      Jwt__Issuer: "pg-control"
+    depends_on:
+      metadata-db:
+        condition: service_healthy
+    ports:
+      - "5000:5000"
+    networks:
+      - pgcontrol
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: pgcontrol_frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "4200:80"
+    networks:
+      - pgcontrol
+
+networks:
+  pgcontrol:
+    driver: bridge
+
+volumes:
+  pgcontrol_metadata_data:

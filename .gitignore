@@ -1,0 +1,32 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+
+# Angular
+node_modules/
+dist/
+.angular/
+
+# Env
+.env
+.env.local
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+bin/
+obj/
+.vs/
+.git/
+*.user
+*.suo
