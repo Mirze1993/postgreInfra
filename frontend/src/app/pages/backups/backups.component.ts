@@ -7,105 +7,96 @@ import { BackupsService, BackupsResponse, WalArchiveStatus } from '../../core/ba
   selector: 'app-backups',
   standalone: true,
   template: `
-    <div class="layout">
-      <header>
-        <h1>Backups</h1>
-        <nav>
-          <a routerLink="/dashboard">Dashboard</a>
-          <a routerLink="/backups" class="active">Backups</a>
-        </nav>
-        <div class="user">
-          <span>{{ auth.auth().username }}</span>
-          <button (click)="logout()">Çıxış</button>
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h2>Backups</h2>
+          <p class="subtitle">pgBackRest · WAL arxivi və backup tarixçəsi</p>
         </div>
-      </header>
+        <button class="btn-secondary" (click)="load()">↻ Yenilə</button>
+      </div>
 
-      <main>
-        <!-- WAL arxivi statusu -->
-        @if (wal(); as w) {
-          @switch (w.status) {
-            @case ('ok') {
-              <div class="banner ok">
-                ✅ WAL arxivi işləyir — son arxivlənmə {{ w.secondsSinceLastArchive }}s əvvəl
-              </div>
-            }
-            @case ('warning') {
-              <div class="banner warn">
-                ⚠ WAL arxivi ləngdir — son arxivlənmə {{ w.secondsSinceLastArchive }}s əvvəl (yazma
-                aktivliyi az ola bilər)
-              </div>
-            }
-            @case ('critical') {
-              <div class="banner bad">
-                ❌ WAL arxivi dayanıb — son uğurlu arxivlənmə {{ w.secondsSinceLastArchive }}s əvvəl
-              </div>
-            }
+      @if (wal(); as w) {
+        <div
+          class="banner"
+          [class.ok]="w.isHealthy"
+          [class.bad]="!w.isHealthy"
+          [class.warn]="w.isWarning"
+        >
+          @if (w.isHealthy && !w.isWarning) {
+            ✅ WAL arxivi işləyir — son arxivlənmə {{ w.secondsSinceLastArchive }}s əvvəl
+          } @else if (w.isWarning) {
+            ⚠ WAL arxivi ləngdir — son arxivlənmə {{ w.secondsSinceLastArchive }}s əvvəl
+          } @else {
+            ❌ WAL arxivi dayanıb — son uğurlu arxivlənmə {{ w.secondsSinceLastArchive }}s əvvəl
           }
-        }
+        </div>
+      }
 
-        <!-- Backup cədvəli -->
-        @if (data(); as d) {
-          <div class="summary">
-            <div class="stat">
-              <span class="label">Stanza</span>
-              <span class="value">{{ d.stanza }}</span>
-            </div>
-            <div class="stat">
-              <span class="label">Status</span>
-              <span class="value" [class.good]="d.status.code === 0">
-                {{ d.status.code === 0 ? 'OK' : d.status.message }}
-              </span>
-            </div>
-            <div class="stat">
-              <span class="label">Backup sayı</span>
-              <span class="value">{{ d.backups.length }}</span>
-            </div>
-            <div class="stat">
-              <span class="label">WAL aralığı</span>
-              <span class="value small">{{ d.wal.min ?? '—' }} → {{ d.wal.max ?? '—' }}</span>
+      @if (data(); as d) {
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-label">Stanza</div>
+            <div class="stat-value">{{ d.stanza }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">Status</div>
+            <div class="stat-value" [class.good]="d.status.code === 0">
+              {{ d.status.code === 0 ? 'OK' : d.status.message }}
             </div>
           </div>
+          <div class="stat-card">
+            <div class="stat-label">Backup sayı</div>
+            <div class="stat-value">{{ d.backups.length }}</div>
+          </div>
+          <div class="stat-card">
+            <div class="stat-label">WAL aralığı</div>
+            <div class="stat-value small">
+              {{ d.wal.min?.slice(-8) ?? '—' }} → {{ d.wal.max?.slice(-8) ?? '—' }}
+            </div>
+          </div>
+        </div>
 
-          <table>
-            <thead>
-              <tr>
-                <th>Label</th>
-                <th>Tip</th>
-                <th>Başlama</th>
-                <th>Bitmə</th>
-                <th>Ölçü</th>
-                <th>WAL aralığı</th>
-                <th>Referans</th>
-              </tr>
-            </thead>
-            <tbody>
-              @for (b of d.backups; track b.label) {
-                <tr>
-                  <td>
-                    <code>{{ b.label }}</code>
-                  </td>
-                  <td>
-                    <span class="badge" [class]="b.type">{{ b.type.toUpperCase() }}</span>
-                  </td>
-                  <td>{{ formatDate(b.timestamp.start) }}</td>
-                  <td>{{ formatDate(b.timestamp.stop) }}</td>
-                  <td>{{ b.sizePretty }}</td>
-                  <td class="small">{{ shortWal(b.wal.start) }} → {{ shortWal(b.wal.stop) }}</td>
-                  <td class="small">{{ b.references.length }} backup</td>
-                </tr>
-              }
-            </tbody>
-          </table>
-
+        <div class="card">
+          <h3>Backup tarixçəsi</h3>
           @if (d.backups.length === 0) {
-            <p class="empty">
-              Heç bir backup yoxdur. İlk backup-ı yaratmaq üçün Mərhələ 4-ü gözləyin.
-            </p>
+            <p class="empty">Heç bir backup yoxdur.</p>
+          } @else {
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Label</th>
+                  <th>Tip</th>
+                  <th>Başlama</th>
+                  <th>Bitmə</th>
+                  <th>Ölçü</th>
+                  <th>Repo</th>
+                  <th>WAL</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (b of d.backups; track b.label) {
+                  <tr>
+                    <td>
+                      <code>{{ b.label }}</code>
+                    </td>
+                    <td>
+                      <span class="badge" [class]="b.type">{{ b.type.toUpperCase() }}</span>
+                    </td>
+                    <td class="small">{{ formatDate(b.timestamp.start) }}</td>
+                    <td class="small">{{ formatDate(b.timestamp.stop) }}</td>
+                    <td>{{ b.sizePretty }}</td>
+                    <td class="small">{{ b.repoSizePretty }}</td>
+                    <td class="small">{{ shortWal(b.wal.start) }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
           }
-        } @else {
-          <p>Yüklənir...</p>
-        }
-      </main>
+        </div>
+      } @else {
+        <div class="loading">Yüklənir...</div>
+      }
     </div>
   `,
   styles: [

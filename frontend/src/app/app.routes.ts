@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
 import { AuthService } from './core/auth.service';
+import { LayoutComponent } from './layout/layout.component';
 
 const authGuard = () => {
   const auth = inject(AuthService);
@@ -16,22 +17,31 @@ export const routes: Routes = [
     loadComponent: () => import('./pages/login/login.component').then((m) => m.LoginComponent),
   },
   {
-    path: 'dashboard',
-    loadComponent: () =>
-      import('./pages/dashboard/dashboard.component').then((m) => m.DashboardComponent),
+    path: '',
+    component: LayoutComponent,
     canActivate: [authGuard],
-  },
-  {
-    path: 'backups',
-    loadComponent: () =>
-      import('./pages/backups/backups.component').then((m) => m.BackupsComponent),
-    canActivate: [authGuard],
-  },
-  {
-    path: 'migrations',
-    loadComponent: () =>
-      import('./pages/migrations/migrations.component').then((m) => m.MigrationsComponent),
-    canActivate: [authGuard],
+    children: [
+      {
+        path: 'dashboard',
+        loadComponent: () =>
+          import('./pages/dashboard/dashboard.component').then((m) => m.DashboardComponent),
+      },
+      {
+        path: 'backups',
+        loadComponent: () =>
+          import('./pages/backups/backups.component').then((m) => m.BackupsComponent),
+      },
+      {
+        path: 'migrations',
+        loadComponent: () =>
+          import('./pages/migrations/migrations.component').then((m) => m.MigrationsComponent),
+      },
+      {
+        path: 'settings',
+        loadComponent: () =>
+          import('./pages/settings/settings.component').then((m) => m.SettingsComponent),
+      },
+    ],
   },
   { path: '**', redirectTo: '/dashboard' },
 ];

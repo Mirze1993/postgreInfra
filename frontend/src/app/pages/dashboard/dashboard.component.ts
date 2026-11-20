@@ -7,61 +7,73 @@ import { Router } from '@angular/router';
   selector: 'app-dashboard',
   standalone: true,
   template: `
-    <div class="layout">
-      <header>
-        <h1>PG Control Plane</h1>
-        <div class="user">
-          <span>{{ auth.auth().username }} ({{ auth.auth().role }})</span>
-          <button (click)="logout()">Çıxış</button>
+    <div class="page">
+      <div class="page-header">
+        <div>
+          <h2>Cluster ümumi vəziyyəti</h2>
+          <p class="subtitle">Real vaxt monitorinq · hər 5 saniyədə yenilənir</p>
         </div>
-      </header>
-      <main>
-        <h2>Dashboard</h2>
+        <button class="btn-secondary" (click)="load()">↻ Yenilə</button>
+      </div>
 
-        @if (cluster.status(); as s) {
-          <!-- Ümumi banner -->
-          <div
-            class="banner"
-            [class.ok]="s.leaderExists && s.hasQuorum"
-            [class.bad]="!s.leaderExists || !s.hasQuorum"
-          >
-            @if (s.leaderExists) {
-              ✅ Klaster işləyir — Lider: <strong>{{ s.leaderName }}</strong>
-            } @else {
-              ❌ Klasterdə lider yoxdur!
-            }
-          </div>
+      @if (cluster.status(); as s) {
+        <div
+          class="banner"
+          [class.ok]="s.leaderExists && s.hasQuorum"
+          [class.bad]="!s.leaderExists || !s.hasQuorum"
+        >
+          @if (s.leaderExists) {
+            ✅ Klaster işləyir — Lider: <strong>{{ s.leaderName }}</strong>
+          } @else {
+            ❌ Klasterdə lider yoxdur!
+          }
+        </div>
 
-          <!-- Node kartları -->
-          <!-- Node kartları -->
-          <div class="cards">
-            @for (node of s.nodes; track node.url) {
-              <div class="card" [class.leader]="isLeader(node.role)">
-                <h3>{{ node.url }}</h3>
-                <p class="role">{{ isLeader(node.role) ? 'PRIMARY' : 'REPLICA' }}</p>
-                <p class="state">{{ node.state }}</p>
-                <p class="timeline">Timeline: {{ node.timeline }}</p>
+        <div class="stats-grid">
+          @for (node of s.nodes; track node.url) {
+            <div class="stat-card" [class.leader]="isLeader(node.role)">
+              <div class="stat-header">
+                <div class="stat-title">{{ node.url.replace('http://', '') }}</div>
+                <span class="badge" [class.primary]="isLeader(node.role)">
+                  {{ isLeader(node.role) ? 'PRIMARY' : 'REPLICA' }}
+                </span>
               </div>
-            }
-          </div>
+              <div class="stat-row">
+                <span class="stat-label">Status</span>
+                <span class="stat-value">{{ node.state }}</span>
+              </div>
+              <div class="stat-row">
+                <span class="stat-label">Timeline</span>
+                <span class="stat-value">{{ node.timeline }}</span>
+              </div>
+            </div>
+          }
+        </div>
 
-          <!-- Replikasiya -->
-          <!-- Replikasiya -->
-          <div class="section">
-            <h3>Replikasiya</h3>
-            @if (s.replication.hasReplica) {
-              <p>
-                Replay Lag: <strong>{{ formatLag(s.replication) }}</strong>
-              </p>
-              <p>State: {{ s.replication.state }} ({{ s.replication.syncState }})</p>
-            } @else {
-              <p class="bad">⚠ Replika qoşulmayıb!</p>
-            }
-          </div>
-        } @else {
-          <p>Yüklənir...</p>
-        }
-      </main>
+        <div class="card">
+          <h3>Replikasiya</h3>
+          @if (s.replication.hasReplica) {
+            <div class="metrics-grid">
+              <div class="metric">
+                <div class="metric-label">Replay Lag</div>
+                <div class="metric-value">{{ formatLag(s.replication) }}</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">State</div>
+                <div class="metric-value">{{ s.replication.state }}</div>
+              </div>
+              <div class="metric">
+                <div class="metric-label">Sync Mode</div>
+                <div class="metric-value">{{ s.replication.syncState }}</div>
+              </div>
+            </div>
+          } @else {
+            <p class="bad">⚠ Replika qoşulmayıb</p>
+          }
+        </div>
+      } @else {
+        <div class="loading">Yüklənir...</div>
+      }
     </div>
   `,
   styles: [

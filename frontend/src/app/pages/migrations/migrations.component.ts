@@ -10,19 +10,6 @@ import { MigrationsService, MigrationScript } from '../../core/migrations.servic
   imports: [FormsModule, RouterLink],
   template: `
     <div class="layout">
-      <header>
-        <h1>Migrations</h1>
-        <nav>
-          <a routerLink="/dashboard">Dashboard</a>
-          <a routerLink="/backups">Backups</a>
-          <a routerLink="/migrations" class="active">Migrations</a>
-        </nav>
-        <div class="user">
-          <span>{{ auth.auth().username }} ({{ auth.auth().role }})</span>
-          <button (click)="logout()">Çıxış</button>
-        </div>
-      </header>
-
       <main>
         <div class="toolbar">
           <h2>Miqrasiya skriptləri</h2>
