@@ -8,6 +8,8 @@ export interface Backup {
   timestamp: { start: string; stop: string };
   wal: { start: string; stop: string };
   sizeBytes: number;
+  repoSizePretty: string;
+  hasError: boolean;
   sizePretty: string;
   repoSizeBytes: number;
   references: string[];
@@ -25,6 +27,7 @@ export interface WalArchiveStatus {
   secondsSinceLastArchive: number;
   isHealthy: boolean;
   status: string;
+  isWarning: boolean;
 }
 
 @Injectable({ providedIn: 'root' })
