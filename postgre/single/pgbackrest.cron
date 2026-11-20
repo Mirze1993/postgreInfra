@@ -1,0 +1,11 @@
+# Host-da: sudo cp pgbackrest.cron /etc/cron.d/pgbackrest && sudo chmod 644 /etc/cron.d/pgbackrest
+# Saat serverin yerli saatı ilədir.
+
+# Bazar günü 02:00 - tam backup
+0 2 * * 0   root  docker exec -u postgres pg_main pgbackrest --stanza=main --type=full backup >> /var/log/pgbackrest-cron.log 2>&1
+
+# Bazar ertəsi-şənbə 02:00 - diferensial backup
+0 2 * * 1-6 root  docker exec -u postgres pg_main pgbackrest --stanza=main --type=diff backup >> /var/log/pgbackrest-cron.log 2>&1
+
+# Hər gün 06:00 - repo və arxiv yoxlaması (xəta olarsa cron log-da görünür)
+0 6 * * *   root  docker exec -u postgres pg_main pgbackrest --stanza=main check >> /var/log/pgbackrest-cron.log 2>&1

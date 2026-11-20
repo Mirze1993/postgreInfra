@@ -1,0 +1,47 @@
+name: pg-ha-lab-step1
+
+services:
+  pg_primary:
+    image: postgres:18
+    container_name: pg_primary
+    restart: unless-stopped
+    environment:
+      POSTGRES_PASSWORD: secretpass
+      POSTGRES_DB: appdb
+    command: >
+      postgres
+      -c wal_level=replica
+      -c max_wal_senders=5
+      -c max_replication_slots=5
+      -c hot_standby=on
+    ports:
+      - "55432:5432"
+    volumes:
+      - primary_data:/var/lib/postgresql
+      - ./primary-init.sh:/docker-entrypoint-initdb.d/init.sh:ro
+    networks:
+      - pgnet
+
+  pg_replica:
+    image: postgres:18
+    container_name: pg_replica
+    restart: unless-stopped
+    depends_on:
+      - pg_primary
+    environment:
+      POSTGRES_PASSWORD: secretpass
+    ports:
+      - "55433:5432"
+    volumes:
+      - replica_data:/var/lib/postgresql
+      - ./replica-entrypoint.sh:/scripts/replica-entrypoint.sh:ro
+    entrypoint: ["bash", "/scripts/replica-entrypoint.sh"]
+    networks:
+      - pgnet
+
+networks:
+  pgnet:
+
+volumes:
+  primary_data:
+  replica_data:

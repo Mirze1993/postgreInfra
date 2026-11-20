@@ -1,0 +1,135 @@
+name: pg-ha-lab-step2
+
+services:
+  # ---------- etcd cluster (3 node, konsensus üçün) ----------
+  etcd1:
+    image: bitnamilegacy/etcd:latest
+    container_name: etcd1
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_NAME=etcd1
+      - ETCD_INITIAL_CLUSTER=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - ETCD_INITIAL_CLUSTER_STATE=new
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://etcd1:2380
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd1:2379
+    networks: [pgnet]
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  etcd2:
+    image: bitnamilegacy/etcd:latest
+    container_name: etcd2
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_NAME=etcd2
+      - ETCD_INITIAL_CLUSTER=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - ETCD_INITIAL_CLUSTER_STATE=new
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://etcd2:2380
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd2:2379
+    networks: [pgnet]
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  etcd3:
+    image: bitnamilegacy/etcd:latest
+    container_name: etcd3
+    environment:
+      - ALLOW_NONE_AUTHENTICATION=yes
+      - ETCD_NAME=etcd3
+      - ETCD_INITIAL_CLUSTER=etcd1=http://etcd1:2380,etcd2=http://etcd2:2380,etcd3=http://etcd3:2380
+      - ETCD_INITIAL_CLUSTER_STATE=new
+      - ETCD_INITIAL_ADVERTISE_PEER_URLS=http://etcd3:2380
+      - ETCD_LISTEN_PEER_URLS=http://0.0.0.0:2380
+      - ETCD_LISTEN_CLIENT_URLS=http://0.0.0.0:2379
+      - ETCD_ADVERTISE_CLIENT_URLS=http://etcd3:2379
+    networks: [pgnet]
+    healthcheck:
+      test: ["CMD", "etcdctl", "endpoint", "health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ---------- PostgreSQL + Patroni ----------
+  pg1:
+    build: .
+    image: pg18-patroni:local
+    pull_policy: build
+    container_name: pg1
+    hostname: pg1
+    restart: unless-stopped
+    ports:
+      - "8008:8008"
+    depends_on:
+      etcd1:
+        condition: service_healthy
+      etcd2:
+        condition: service_healthy
+      etcd3:
+        condition: service_healthy
+    user: root                     # ⬅️ root kimi başla
+    entrypoint: >
+      sh -c "chown -R postgres:postgres /var/lib/postgresql/data &&
+             exec gosu postgres patroni /etc/patroni.yml"
+    volumes:
+      - pg1_data:/var/lib/postgresql/data
+      - ./patroni-pg1.yml:/etc/patroni.yml:ro
+      - pg_backup:/var/lib/pgbackres
+      - ./pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+    networks: [pgnet]
+
+  pg2:
+    image: pg18-patroni:local
+    pull_policy: build
+    container_name: pg2
+    hostname: pg2
+    restart: unless-stopped
+    ports:
+      - "8009:8008"
+    depends_on:
+      etcd1:
+        condition: service_healthy
+      etcd2:
+        condition: service_healthy
+      etcd3:
+        condition: service_healthy
+    user: root                     # ⬅️ root kimi başla
+    entrypoint: >
+      sh -c "chown -R postgres:postgres /var/lib/postgresql/data &&
+             exec gosu postgres patroni /etc/patroni.yml"
+    volumes:
+      - pg2_data:/var/lib/postgresql/data
+      - ./patroni-pg2.yml:/etc/patroni.yml:ro
+      - pg_backup:/var/lib/pgbackres
+      - ./pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+    networks: [pgnet]
+
+  # ---------- HAProxy ----------
+  haproxy:
+    image: haproxy:latest
+    container_name: pg_haproxy
+    restart: unless-stopped
+    depends_on: [pg1, pg2]
+    volumes:
+      - ./haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    ports:
+      - "5500:5000"   # yazma (primary)
+      - "5501:5001"   # oxuma (replika)
+    networks: [pgnet]
+
+networks:
+  pgnet:
+
+volumes:
+  pg1_data:
+  pg2_data:
+  pg_backup:

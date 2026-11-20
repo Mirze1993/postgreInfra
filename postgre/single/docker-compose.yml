@@ -1,0 +1,97 @@
+# =============================================================================
+# PostgreSQL 18 + PgBouncer + pgBackRest (WAL arxivi / PITR)
+# Server: 6 GB RAM cəmi. PostgreSQL konteynerinə 4 GB ayrılıb, qalan ~2 GB
+# OS, Docker və PgBouncer üçündür.
+#
+# Quraşdırma:
+#   1) cp .env.example .env   (parolu dəyişin)
+#   2) sudo mkdir -p /srv/pg/data /srv/pg/backrest
+#      sudo chown 999:999 /srv/pg/data /srv/pg/backrest
+#      ÖNƏMLİ: /srv/pg/backrest mümkünsə ayrı diskdə/mount-da olsun
+#   3) docker compose up -d --build
+#   4) Stanza və ilk backup (bir dəfə):
+#      docker exec -u postgres pg_main pgbackrest --stanza=main stanza-create
+#      docker exec -u postgres pg_main pgbackrest --stanza=main check
+#      docker exec -u postgres pg_main pgbackrest --stanza=main --type=full backup
+#   5) sudo cp pgbackrest.cron /etc/cron.d/pgbackrest
+#
+# "docker compose down -v" prod-da istifadə etməyin.
+# =============================================================================
+
+name: pgstack
+
+services:
+  postgres:
+    build: .                        # Dockerfile: postgres:18 + pgbackrest
+    image: pg18-pgbackrest:local
+    container_name: pg_main
+    restart: unless-stopped
+    shm_size: 512m                  # paralel sorğular üçün /dev/shm
+    mem_limit: 4g
+    memswap_limit: 4g               # swap yoxdur (OOM təhlükəsini gizlətməsin)
+    cpus: 2                         # serverinizin CPU sayına görə dəyişin
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-appdb}
+      POSTGRES_USER: ${POSTGRES_USER:-appuser}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD .env faylında təyin olunmalıdır}
+      POSTGRES_INITDB_ARGS: "--data-checksums --encoding=UTF8 --locale=C.UTF-8"
+      TZ: UTC
+    command: >
+      postgres
+      -c config_file=/etc/postgresql/postgresql.conf
+    volumes:
+      # PG 18+ image: mount nöqtəsi /var/lib/postgresql, PGDATA = /var/lib/postgresql/18/docker
+      - pg_data:/var/lib/postgresql
+      - ./postgresql.conf:/etc/postgresql/postgresql.conf:ro
+      - ./pgbackrest.conf:/etc/pgbackrest/pgbackrest.conf:ro
+      - pg_backrest:/var/lib/pgbackrest
+    ports:
+      - "127.0.0.1:5432:5432"
+    networks:
+      - backend
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 30s
+    stop_grace_period: 90s          # düzgün shutdown (son checkpoint + WAL arxivi)
+    ulimits:
+      nofile:
+        soft: 65536
+        hard: 65536
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: pg_bouncer
+    restart: unless-stopped
+    mem_limit: 128m
+    depends_on:
+      postgres:
+        condition: service_healthy
+    entrypoint: ["pgbouncer", "/etc/pgbouncer/pgbouncer.ini"]
+    volumes:
+      - ./pgbouncer.ini:/etc/pgbouncer/pgbouncer.ini:ro
+      - ./userlist.txt:/etc/pgbouncer/userlist.txt:ro
+    ports:
+      - "6432:5432"
+    networks:
+      - backend
+    logging:
+      driver: json-file
+      options:
+        max-size: "20m"
+        max-file: "3"
+
+networks:
+  backend:
+    driver: bridge
+    
+volumes:
+  pg_data:
+  pg_backrest:
