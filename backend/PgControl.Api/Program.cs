@@ -1,3 +1,5 @@
+using Octokit.Webhooks;
+using Octokit.Webhooks.AspNetCore;
 using PgControl.Api.Services;
 using Serilog;
 
@@ -46,6 +48,8 @@ builder.Services.AddAuthentication("Bearer")
         };
     });
 builder.Services.AddAuthorization();
+builder.Services.AddScoped<MigrationScriptService>();
+
 
 // ─── Pipeline ────────────────────────────────────────────
 var app = builder.Build();
@@ -64,6 +68,7 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHealthChecks("/health");
+
 app.MapGet("/", () => new { name = "PG Control Plane API", version = "0.1.0" });
 
 app.Run();
