@@ -63,7 +63,7 @@ networks:
     driver: bridge
   ha-network:
     external: true
-    name: pg-ha-lab-step2_pgnet
+    name: pg-ha-lab_pgnet
 
 volumes:
   pgcontrol_metadata_data:
