@@ -8,16 +8,28 @@ namespace PgControl.Api.Services;
 public class MigrationScriptService
 {
     private readonly string _metadataConn;
-    private readonly string _stagingConn;
-    private readonly string _productionConn;
+    private readonly FlywayRunner.FlywayConnection _staging;
+    private readonly FlywayRunner.FlywayConnection _production;
     private readonly ILogger<MigrationScriptService> _logger;
 
     public MigrationScriptService(IConfiguration cfg, ILogger<MigrationScriptService> logger)
     {
         _metadataConn = cfg.GetConnectionString("Metadata")!;
-        _stagingConn = cfg["Flyway:StagingConnection"]!;
-        _productionConn = cfg["Flyway:ProductionConnection"]!;
         _logger = logger;
+
+        var stagingCfg = cfg.GetSection("Flyway:StagingConnection");
+        _staging = new FlywayRunner.FlywayConnection(
+            Url: stagingCfg["Url"]!,
+            User: stagingCfg["User"]!,
+            Password: stagingCfg["Password"]!
+        );
+
+        var prodCfg = cfg.GetSection("Flyway:ProductionConnection");
+        _production = new FlywayRunner.FlywayConnection(
+            Url: prodCfg["Url"]!,
+            User: prodCfg["User"]!,
+            Password: prodCfg["Password"]!
+        );
     }
 
     // ── 1. CREATE (draft) ─────────────────────────────────
@@ -95,7 +107,8 @@ public class MigrationScriptService
 
             // Flyway staging-də icra et
             var (exit, output, err) = await FlywayRunner.RunAsync(
-                $"migrate -url={_stagingConn} -locations=filesystem:{tempDir} -baselineOnMigrate=true");
+                _staging,
+                $"migrate -locations=filesystem:{tempDir} -baselineOnMigrate=true");
 
             Directory.Delete(tempDir, true);
 
@@ -170,8 +183,9 @@ public class MigrationScriptService
             await File.WriteAllTextAsync(newFile, script.SqlContent);
 
             // Flyway ilə production-a tətbiq
-            var (exit, output, err) = await FlywayRunner.RunAsync(
-                $"migrate -url={_productionConn} -locations=filesystem:{tempDir} -baselineOnMigrate=true");
+          var (exit, output, err) = await FlywayRunner.RunAsync(
+              _production,
+              $"migrate -locations=filesystem:{tempDir} -baselineOnMigrate=true");
 
             Directory.Delete(tempDir, true);
 
@@ -415,8 +429,16 @@ public class MigrationAuditEntry
 // ─── Flyway runner (köhnə FlywayService-i əvəz edir) ───
 public static class FlywayRunner
 {
-    public static async Task<(int ExitCode, string Output, string Error)> RunAsync(string args)
+    public record FlywayConnection(string Url, string User, string Password);
+
+    public static async Task<(int ExitCode, string Output, string Error)> RunAsync(
+        FlywayConnection conn, string command)
     {
+        var args = $"{command} " +
+                   $"-url={conn.Url} " +
+                   $"-user={conn.User} " +
+                   $"-password={conn.Password}";
+
         using var process = new System.Diagnostics.Process
         {
             StartInfo = new System.Diagnostics.ProcessStartInfo
@@ -433,6 +455,19 @@ public static class FlywayRunner
         var output = await process.StandardOutput.ReadToEndAsync();
         var error = await process.StandardError.ReadToEndAsync();
         await process.WaitForExitAsync();
+
+        // ⚠️ Parolu log-a yazmamaq üçün output-da gizlət
+        output = output.Replace(conn.Password, "********");
+        error = error.Replace(conn.Password, "********");
+
         return (process.ExitCode, output, error);
+    }
+
+    // Köhnə imza ilə uyğunluq üçün overload (köhnə kod varsa)
+    public static Task<(int ExitCode, string Output, string Error)> RunAsync(string command)
+    {
+        // Bu overload artıq istifadə olunmamalıdır
+        throw new InvalidOperationException(
+            "RunAsync(string) artıq dəstəklənmir. RunAsync(FlywayConnection, string) istifadə et.");
     }
 }
