@@ -24,6 +24,7 @@ export interface WalArchiveStatus {
   failedCount: number;
   secondsSinceLastArchive: number;
   isHealthy: boolean;
+  status: string;
 }
 
 @Injectable({ providedIn: 'root' })
