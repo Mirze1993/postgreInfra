@@ -16,6 +16,7 @@ services:
       - "5433:5432"
     networks:
       - pgcontrol
+      - proxy
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U pgcontrol"]
       interval: 5s
@@ -42,6 +43,7 @@ services:
     networks:
       - pgcontrol
       - ha-network
+      - proxy
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./migrations:/migrations:ro
@@ -58,6 +60,7 @@ services:
       - "4200:80"
     networks:
       - pgcontrol
+      - proxy
 
 networks:
   pgcontrol:
@@ -65,6 +68,9 @@ networks:
   ha-network:
     external: true
     name: pg-ha-lab_pgnet
+  proxy:
+    external: true
+    name: proxy
 
 volumes:
   pgcontrol_metadata_data:
