@@ -9,12 +9,16 @@ FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS runtime
 WORKDIR /app
 
 ARG DOCKER_VERSION=20.10.14
+ARG COMPOSE_VERSION=v2.24.6
+
 RUN apt-get update && \
     apt-get install -y --no-install-recommends wget tar ca-certificates && \
     wget -q https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz -O /tmp/docker.tgz && \
     tar -xzf /tmp/docker.tgz -C /tmp && \
     mv /tmp/docker/docker /usr/local/bin/docker && \
     chmod +x /usr/local/bin/docker && \
+    wget -q https://github.com/docker/compose/releases/download/${COMPOSE_VERSION}/docker-compose-linux-x86_64 -O /usr/local/bin/docker-compose && \
+    chmod +x /usr/local/bin/docker-compose && \
     rm -rf /tmp/docker* && \
     apt-get clean && rm -rf /var/lib/apt/lists/*
 

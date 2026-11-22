@@ -51,17 +51,14 @@ app.MapPost("/internal/nodes/{name}/restart", async (string name, ILogger<Progra
 app.MapPost("/internal/replicas/create", async (
     CreateReplicaReq req, ILogger<Program> log) =>
 {
-    // Yalnız icazəli adlar
     if (!System.Text.RegularExpressions.Regex.IsMatch(req.Name, @"^pg\d+$"))
         return Results.BadRequest(new { error = "Ad yalnız 'pg' + rəqəm olmalıdır" });
 
-    if (!System.Text.RegularExpressions.Regex.IsMatch(req.HostPort.ToString(), @"^\d+$"))
-        return Results.BadRequest(new { error = "HostPort rəqəm olmalıdır" });
-
-    // docker compose -f /compose/docker-compose.yml up -d <name>
+    // ⚠️ docker-compose (standalone), docker compose (plugin) DEYİL
     var (exit, output, error) = await RunProcessAsync(
-        "docker",
-        $"compose -f /compose/docker-compose.yml up -d {req.Name}");
+        "docker-compose",
+        $"-p pg-ha-lab-step2 -f /compose/ha-docker-compose.yml " +
+        $"--profile {req.Name} up -d {req.Name}");
 
     log.LogInformation("Create replica {Name}: exit={Exit}", req.Name, exit);
 
@@ -77,8 +74,9 @@ app.MapPost("/internal/replicas/{name}/remove", async (string name, ILogger<Prog
         return Results.BadRequest(new { error = "Ad yalnız 'pg' + rəqəm olmalıdır" });
 
     var (exit, output, error) = await RunProcessAsync(
-        "docker",
-        $"compose -f /compose/docker-compose.yml rm -sf {name}");
+        "docker-compose",
+        $"-p pg-ha-lab-step2 -f /compose/ha-docker-compose.yml " +
+        $"rm -sf {name}");
 
     log.LogInformation("Remove replica {Name}: exit={Exit}", name, exit);
 
