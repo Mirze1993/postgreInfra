@@ -62,15 +62,39 @@ app.MapPost("/internal/replicas/create", async (
             statusCode: 400);
 
     // 2) Network adını pg1-dən dinamik tap
+    // 2) Network adını pg1-dən dinamik tap (DÜZGÜN — separator ilə)
     var (netExit, netOut, netErr) = await RunProcessAsync(
         "docker",
-        "inspect pg1 --format \"{{ range $k, $v := .NetworkSettings.Networks }}{{ $k }}{{ end }}\"");
+        "inspect pg1 --format \"{{ range $k, $v := .NetworkSettings.Networks }}{{ $k }}|{{ end }}\"");
+
     if (netExit != 0)
         return Results.Json(
             new { success = false, error = $"Network aşkar edilə bilmədi: {netErr}" },
             statusCode: 500);
 
-    var networkName = netOut.Trim();
+// netOut = "pg-ha-lab_pgnet|proxy|"
+// 1) Əvvəlcə "_pgnet" ilə bitən network-ü seç (HA internal)
+// 2) Yoxdursa, "proxy" olmayanı seç
+// 3) Heç biri yoxdursa, ilkini seç
+    var networks = netOut
+        .Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        .ToList();
+
+    var networkName = networks.FirstOrDefault(n => n.EndsWith("_pgnet"))
+                      ?? networks.FirstOrDefault(n => !n.Contains("proxy"))
+                      ?? networks.FirstOrDefault()
+                      ?? "";
+
+    if (string.IsNullOrEmpty(networkName))
+        return Results.Json(
+            new { success = false, error = "pg1 üçün heç bir network tapılmadı" },
+            statusCode: 500);
+
+// Əlavə: "proxy" içərisində "pgnet" ola bilər — yoxla
+    if (networkName.Contains("pgnetproxy"))
+        return Results.Json(
+            new { success = false, error = $"Network adı səhv birləşdirilib: {networkName}" },
+            statusCode: 500);
     if (string.IsNullOrEmpty(networkName))
         return Results.Json(
             new { success = false, error = "pg1-in network-ü yoxdur" },
