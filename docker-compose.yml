@@ -59,9 +59,10 @@ services:
     restart: unless-stopped
     environment:
       Controller__Token: "change-me-in-production-please-32-chars-min"
+      Controller__HostComposeDir: "/opt/postgreHA"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /opt/postgreHA:/compose:ro
+      - /opt/postgreHA:/opt/postgreHA:ro
     networks:
       - pgcontrol
 
