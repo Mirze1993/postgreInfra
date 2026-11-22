@@ -12,7 +12,6 @@ services:
     volumes:
       - pgcontrol_metadata_data:/var/lib/postgresql
       - ./docker/metadata-db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-
     networks:
       - pgcontrol
       - proxy
@@ -39,7 +38,8 @@ services:
     depends_on:
       metadata-db:
         condition: service_healthy
-      - docker-controller
+      docker-controller:
+        condition: service_started
     ports:
       - "5000:5000"
     networks:
@@ -50,23 +50,21 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./migrations:/migrations:ro
 
-    docker-controller:
-      build:
-        context: ./docker-controller
-        dockerfile: Dockerfile
-      image: pgcontrol-docker-controller:local
-      container_name: pgcontrol_docker_controller
-      restart: unless-stopped
-      environment:
-        Controller__Token: "change-me-in-production-please-32-chars-min"
-      volumes:
-        - /var/run/docker.sock:/var/run/docker.sock # ⬅️ RW (yalnız bu konteyner)
-        - ./migrations:/compose/migrations:ro
-        - /var/run/docker.sock:/var/run/docker.sock
-        - ./docker-compose.yml:/compose/docker-compose.yml:ro # compose üçün
-      networks:
-        - pgcontrol
-    # ⚠️ Diqqət: bu konteyner yalnız daxili şəbəkədə əlçatandır
+  docker-controller:
+    build:
+      context: ./docker-controller
+      dockerfile: Dockerfile
+    image: pgcontrol-docker-controller:local
+    container_name: pgcontrol_docker_controller
+    restart: unless-stopped
+    environment:
+      Controller__Token: "change-me-in-production-please-32-chars-min"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./migrations:/compose/migrations:ro
+      - ./docker-compose.yml:/compose/docker-compose.yml:ro
+    networks:
+      - pgcontrol
 
   frontend:
     build:
