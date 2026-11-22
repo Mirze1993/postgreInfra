@@ -19,7 +19,7 @@ builder.Services.AddHttpClient<PatroniService>();
 builder.Services.AddScoped<PostgresMetricsService>();
 builder.Services.AddScoped<PgBackRestService>();
 builder.Services.AddScoped<FlywayService>();
-
+builder.Services.AddScoped<RestoreJobService>();
 builder.Services.AddHealthChecks();
 
 // CORS — Angular dev server üçün
