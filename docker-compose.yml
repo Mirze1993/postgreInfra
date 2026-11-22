@@ -61,7 +61,6 @@ services:
       Controller__Token: "change-me-in-production-please-32-chars-min"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - /opt/postgreHA/docker-compose.yml:/compose/ha-docker-compose.yml:ro
       - /opt/postgreHA:/compose:ro
     networks:
       - pgcontrol
