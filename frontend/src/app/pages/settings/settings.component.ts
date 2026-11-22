@@ -492,7 +492,11 @@ export class SettingsComponent implements OnInit {
   }
 
   nodeName(url: string): string {
-    return url.split(':')[1].replace('//', '');
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return url;
+    }
   }
 
   currentLeader(): string {
@@ -551,8 +555,16 @@ export class SettingsComponent implements OnInit {
     this.removeConfirm = '';
   }
 
-  async executeRemove(name: NodeInfo) {
+  async executeRemove(node: NodeInfo) {
+    const name = this.nodeName(node.url);
+
+    if (!name) {
+      alert('Node adı müəyyən edilmədi');
+      return;
+    }
+
     this.busy.set(true);
+
     try {
       const r = await this.http.post(
         '/cluster-operations/replicas/remove',
@@ -562,10 +574,11 @@ export class SettingsComponent implements OnInit {
         },
         { headers: this.headers },
       );
+
       this.showRemove.set(null);
       this.pollOperation(r.data.operationId);
     } catch (e: any) {
-      alert(e.response?.data?.error ?? 'Xəta');
+      alert(e.response?.data?.error ?? 'Replica silinərkən xəta baş verdi');
       this.busy.set(false);
     }
   }
