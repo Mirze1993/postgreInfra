@@ -8,40 +8,41 @@ import { AuthService } from '../core/auth.service';
   standalone: true,
   template: `
     <header class="header">
-      <div class="left">
-        <h1 class="page-title">{{ pageTitle() }}</h1>
-        <div class="breadcrumb">
-          PG Control Plane / <span>{{ pageTitle() }}</span>
+      <div class="header-left">
+        <div class="title-area">
+          <h1 class="page-title">{{ pageTitle() }}</h1>
+          <div class="breadcrumb">
+            <span>Control Plane</span>
+            <span class="separator">/</span>
+            <strong>{{ pageTitle() }}</strong>
+          </div>
         </div>
       </div>
 
-      <div class="right">
-        <div class="status-indicator">
-          <span class="dot online"></span>
-          <span class="status-text">Cluster Online</span>
+      <div class="header-right">
+        <div class="cluster-status">
+          <span class="status-dot"></span>
+          <span>Cluster Healthy</span>
         </div>
+
+        <div class="header-divider"></div>
 
         <div class="user-menu">
           <button class="user-btn" (click)="showMenu.set(!showMenu())">
             <div class="avatar">{{ userInitial() }}</div>
+
             <div class="user-info">
-              <div class="name">{{ auth.auth().username }}</div>
-              <div class="role">{{ auth.auth().role }}</div>
+              <span class="user-name">{{ auth.auth().username }}</span>
+              <span class="user-role">{{ auth.auth().role }}</span>
             </div>
-            <svg viewBox="0 0 24 24" width="14" height="14">
-              <path fill="currentColor" d="M7 10l5 5 5-5z" />
-            </svg>
+
+            <span class="chevron">⌄</span>
           </button>
 
           @if (showMenu()) {
             <div class="dropdown">
               <button (click)="logout()">
-                <svg viewBox="0 0 24 24" width="14" height="14">
-                  <path
-                    fill="currentColor"
-                    d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"
-                  />
-                </svg>
+                <span>↪</span>
                 Çıxış
               </button>
             </div>
@@ -53,33 +54,175 @@ import { AuthService } from '../core/auth.service';
   styles: [
     `
       .header {
-        height: 64px;
-        min-height: 64px;
-        background: #fff;
+        height: 72px;
+        min-height: 72px;
+        padding: 0 28px;
+        background: #ffffff;
         border-bottom: 1px solid #e2e8f0;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0 1.5rem;
         flex-shrink: 0;
-        box-sizing: border-box;
+        position: relative;
+        z-index: 20;
+      }
+
+      .page-title {
+        margin: 0 0 5px;
+        color: #0f172a;
+        font-size: 19px;
+        font-weight: 700;
+      }
+
+      .breadcrumb {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 12px;
+        color: #94a3b8;
+      }
+
+      .breadcrumb strong {
+        color: #475569;
+        font-weight: 500;
+      }
+
+      .header-right {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .cluster-status {
+        display: flex;
+        align-items: center;
+        gap: 9px;
+        padding: 8px 13px;
+        border-radius: 20px;
+        background: #ecfdf5;
+        color: #15803d;
+        font-size: 12px;
+        font-weight: 600;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: #16a34a;
+        box-shadow: 0 0 0 3px #bbf7d0;
+      }
+
+      .header-divider {
+        width: 1px;
+        height: 32px;
+        background: #e2e8f0;
+      }
+
+      .user-menu {
+        position: relative;
+      }
+
+      .user-btn {
+        display: flex;
+        align-items: center;
+        gap: 11px;
+        padding: 6px 10px;
+        background: transparent;
+        border: 0;
+        border-radius: 9px;
+        cursor: pointer;
+      }
+
+      .user-btn:hover {
+        background: #f8fafc;
+      }
+
+      .avatar {
+        width: 38px;
+        height: 38px;
+        border-radius: 50%;
+        background: linear-gradient(135deg, #2563eb, #6366f1);
+        color: white;
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+      }
+
+      .user-info {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 3px;
+      }
+
+      .user-name {
+        font-size: 13px;
+        color: #0f172a;
+        font-weight: 600;
+      }
+
+      .user-role {
+        font-size: 11px;
+        color: #94a3b8;
+      }
+
+      .chevron {
+        color: #64748b;
+        font-size: 18px;
+      }
+
+      .dropdown {
+        position: absolute;
+        top: calc(100% + 10px);
+        right: 0;
+        min-width: 170px;
+        background: white;
+        border: 1px solid #e2e8f0;
+        border-radius: 9px;
+        padding: 5px;
+        box-shadow: 0 8px 25px rgba(15, 23, 42, 0.1);
+      }
+
+      .dropdown button {
+        width: 100%;
+        padding: 10px;
+        border: 0;
+        border-radius: 6px;
+        background: transparent;
+        color: #dc2626;
+        cursor: pointer;
+        text-align: left;
+      }
+
+      .dropdown button:hover {
+        background: #fef2f2;
       }
 
       @media (max-width: 768px) {
         .header {
-          padding: 0 0.75rem;
+          padding: 0 12px;
+          height: 64px;
+          min-height: 64px;
         }
 
-        .status-indicator {
+        .page-title {
+          font-size: 16px;
+        }
+
+        .header-right {
+          gap: 8px;
+        }
+
+        .cluster-status {
+          padding: 7px;
+          font-size: 0;
+        }
+
+        .user-info,
+        .chevron,
+        .header-divider {
           display: none;
-        }
-
-        .user-info {
-          display: none;
-        }
-
-        .right {
-          gap: 0.5rem;
         }
       }
     `,
