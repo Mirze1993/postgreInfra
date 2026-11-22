@@ -12,8 +12,7 @@ services:
     volumes:
       - pgcontrol_metadata_data:/var/lib/postgresql
       - ./docker/metadata-db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    ports:
-      - "5433:5432"
+
     networks:
       - pgcontrol
       - proxy
@@ -56,8 +55,6 @@ services:
     restart: unless-stopped
     depends_on:
       - backend
-    ports:
-      - "4200:80"
     networks:
       - pgcontrol
       - proxy
