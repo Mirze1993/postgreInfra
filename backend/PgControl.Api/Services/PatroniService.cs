@@ -47,11 +47,33 @@ public class PatroniService
 
     public async Task<PatroniClusterStatus> GetClusterStatusAsync()
     {
-        var nodes = new List<PatroniNodeStatus>();
-        foreach (var url in _nodeUrls)
-            nodes.Add(await GetNodeStatusAsync(url));
+        var members = await GetClusterMembersAsync();
 
-        // Patroni köhnə versiyalarda "master", yeni versiyalarda "primary" qaytarır
+        var nodes = new List<PatroniNodeStatus>();
+
+        if (members?.Members != null && members.Members.Count > 0)
+        {
+            foreach (var member in members.Members)
+            {
+                var nodeUrl = $"http://{member.Name}:8008";
+
+                var status = await GetNodeStatusAsync(nodeUrl);
+
+                if (status != null)
+                    nodes.Add(status);
+            }
+        }
+        else
+        {
+            foreach (var url in _nodeUrls)
+            {
+                var status = await GetNodeStatusAsync(url);
+
+                if (status != null)
+                    nodes.Add(status);
+            }
+        }
+
         var leader = nodes.FirstOrDefault(n =>
             n.Role.Equals("primary", StringComparison.OrdinalIgnoreCase) ||
             n.Role.Equals("master", StringComparison.OrdinalIgnoreCase) ||
@@ -62,7 +84,8 @@ public class PatroniService
             Nodes = nodes,
             LeaderName = leader?.Url,
             LeaderExists = leader != null,
-            HasQuorum = nodes.Count(n => n.State == "running") >= 2
+            HasQuorum = nodes.Count(n =>
+                n.State.Equals("running", StringComparison.OrdinalIgnoreCase)) >= 2
         };
     }
 
