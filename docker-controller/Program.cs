@@ -133,11 +133,12 @@ app.MapPost("/internal/replicas/create", async (
         $"--restart unless-stopped " +
         $"-v {newVolume}:/var/lib/postgresql/data " +
         $"-v {hostPatroniConfig}:/etc/patroni.yml:ro " +
+        $"--entrypoint /bin/bash " +
         $"pg18-patroni:local " +
-        $"bash -c 'mkdir -p /var/lib/postgresql/data && " +
+        $"-c \"mkdir -p /var/lib/postgresql/data/pgdata && " +
         $"chown -R postgres:postgres /var/lib/postgresql && " +
-        $"chmod 700 /var/lib/postgresql/data && " +
-        $"exec gosu postgres patroni /etc/patroni.yml'";
+        $"chmod 700 /var/lib/postgresql/data/pgdata && " +
+        $"exec gosu postgres patroni /etc/patroni.yml\"";
 
     log.LogInformation("Run: docker {Args}", runArgs);
 
