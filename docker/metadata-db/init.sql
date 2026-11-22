@@ -120,3 +120,115 @@ CREATE TABLE IF NOT EXISTS cluster_state (
     CONSTRAINT single_row CHECK (id = 1)
 );
 INSERT INTO cluster_state (id) VALUES (1) ON CONFLICT DO NOTHING;
+-- ═══════════════════════════════════════════════════════════
+-- PG Control Plane — Metadata DB sxemi
+-- ═══════════════════════════════════════════════════════════
+
+-- ── Mərhələ 1-2: Miqrasiya skriptləri ──────────────────────
+CREATE TABLE IF NOT EXISTS migration_scripts (
+    id              serial PRIMARY KEY,
+    version         text NOT NULL UNIQUE,
+    description     text NOT NULL,
+    sql_content     text NOT NULL,
+    checksum        text NOT NULL,
+    status          text NOT NULL DEFAULT 'draft',
+    created_by      text NOT NULL,
+    created_at      timestamptz NOT NULL DEFAULT now(),
+    submitted_at    timestamptz,
+    reviewed_by     text,
+    reviewed_at     timestamptz,
+    applied_by      text,
+    applied_at      timestamptz,
+    validation_log  text,
+    apply_log       text,
+    rollback_sql    text,
+    notes           text
+);
+CREATE INDEX IF NOT EXISTS idx_migration_scripts_status ON migration_scripts(status);
+
+CREATE TABLE IF NOT EXISTS migration_audit_log (
+    id              bigserial PRIMARY KEY,
+    migration_id    int REFERENCES migration_scripts(id) ON DELETE SET NULL,
+    version         text,
+    action          text NOT NULL,
+    performed_by    text NOT NULL,
+    performed_at    timestamptz NOT NULL DEFAULT now(),
+    details         jsonb
+);
+CREATE INDEX IF NOT EXISTS idx_audit_migration_id ON migration_audit_log(migration_id);
+CREATE INDEX IF NOT EXISTS idx_audit_performed_at ON migration_audit_log(performed_at DESC);
+
+-- ── Mərhələ 4: Backup + Restore ────────────────────────────
+
+-- Backup əməliyyatları (full/diff/incr)
+CREATE TABLE IF NOT EXISTS backup_jobs (
+    id              serial PRIMARY KEY,
+    backup_type     text NOT NULL,
+    status          text NOT NULL DEFAULT 'running',
+    started_by      text NOT NULL,
+    started_at      timestamptz NOT NULL DEFAULT now(),
+    finished_at     timestamptz,
+    label           text,
+    log             text,
+    error           text
+);
+CREATE INDEX IF NOT EXISTS idx_backup_jobs_status ON backup_jobs(status);
+
+-- PITR restore əməliyyatları
+CREATE TABLE IF NOT EXISTS restore_jobs (
+    id              serial PRIMARY KEY,
+    backup_label    text,
+    target_time     timestamptz NOT NULL,
+    target_action   text NOT NULL DEFAULT 'promote',
+    status          text NOT NULL DEFAULT 'pending',
+    requested_by    text NOT NULL,
+    requested_at    timestamptz NOT NULL DEFAULT now(),
+    confirmed_at    timestamptz,
+    started_at      timestamptz,
+    finished_at     timestamptz,
+    log             text,
+    error           text,
+    snapshot_path   text
+);
+CREATE INDEX IF NOT EXISTS idx_restore_jobs_status ON restore_jobs(status);
+CREATE INDEX IF NOT EXISTS idx_restore_jobs_requested_at ON restore_jobs(requested_at DESC);
+
+-- Maintenance mode (klaster vəziyyəti)
+CREATE TABLE IF NOT EXISTS cluster_state (
+    id                  int PRIMARY KEY DEFAULT 1,
+    maintenance         boolean NOT NULL DEFAULT false,
+    maintenance_reason  text,
+    updated_by          text,
+    updated_at          timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT single_row CHECK (id = 1)
+);
+INSERT INTO cluster_state (id) VALUES (1) ON CONFLICT DO NOTHING;
+-- Klaster əməliyyatları (replica add/remove, switchover, restart)
+CREATE TABLE IF NOT EXISTS cluster_operations (
+    id              serial PRIMARY KEY,
+    operation_type  text NOT NULL,
+    -- add_replica | remove_replica | switchover | restart_node | stop_node
+    target_node     text,           -- hansı node (remove/restart/stop üçün)
+    status          text NOT NULL DEFAULT 'pending',
+    -- pending | running | completed | failed | cancelled
+    requested_by    text NOT NULL,
+    requested_at    timestamptz NOT NULL DEFAULT now(),
+    started_at      timestamptz,
+    finished_at     timestamptz,
+    log             text,
+    error           text,
+    metadata        jsonb           -- əlavə parametrlər
+);
+
+CREATE INDEX IF NOT EXISTS idx_cluster_ops_status ON cluster_operations(status);
+CREATE INDEX IF NOT EXISTS idx_cluster_ops_requested_at ON cluster_operations(requested_at DESC);
+
+-- Lock: eyni anda yalnız bir klaster əməliyyatı
+CREATE TABLE IF NOT EXISTS cluster_lock (
+    id              int PRIMARY KEY DEFAULT 1,
+    locked          boolean NOT NULL DEFAULT false,
+    locked_by       int REFERENCES cluster_operations(id) ON DELETE SET NULL,
+    locked_at       timestamptz,
+    CONSTRAINT single_lock CHECK (id = 1)
+);
+INSERT INTO cluster_lock (id) VALUES (1) ON CONFLICT DO NOTHING;

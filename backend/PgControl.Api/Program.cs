@@ -20,6 +20,8 @@ builder.Services.AddScoped<PostgresMetricsService>();
 builder.Services.AddScoped<PgBackRestService>();
 builder.Services.AddScoped<FlywayService>();
 builder.Services.AddScoped<RestoreJobService>();
+builder.Services.AddHttpClient<DockerControllerClient>();
+builder.Services.AddScoped<ClusterOperationService>();
 builder.Services.AddHealthChecks();
 
 // CORS — Angular dev server üçün

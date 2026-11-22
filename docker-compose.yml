@@ -34,9 +34,12 @@ services:
       Jwt__Key: "dev-only-key-change-in-prod-min-32-chars!!"
       Jwt__Issuer: "pg-control"
       DOCKER_API_VERSION: "1.41"
+      Controller__BaseUrl: "http://docker-controller:6000"
+      Controller__Token: "change-me-in-production-please-32-chars-min"
     depends_on:
       metadata-db:
         condition: service_healthy
+      - docker-controller
     ports:
       - "5000:5000"
     networks:
@@ -46,6 +49,24 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
       - ./migrations:/migrations:ro
+
+    docker-controller:
+      build:
+        context: ./docker-controller
+        dockerfile: Dockerfile
+      image: pgcontrol-docker-controller:local
+      container_name: pgcontrol_docker_controller
+      restart: unless-stopped
+      environment:
+        Controller__Token: "change-me-in-production-please-32-chars-min"
+      volumes:
+        - /var/run/docker.sock:/var/run/docker.sock # ⬅️ RW (yalnız bu konteyner)
+        - ./migrations:/compose/migrations:ro
+        - /var/run/docker.sock:/var/run/docker.sock
+        - ./docker-compose.yml:/compose/docker-compose.yml:ro # compose üçün
+      networks:
+        - pgcontrol
+    # ⚠️ Diqqət: bu konteyner yalnız daxili şəbəkədə əlçatandır
 
   frontend:
     build:
