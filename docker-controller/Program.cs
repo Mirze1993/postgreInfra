@@ -62,19 +62,41 @@ app.MapPost("/internal/replicas/create", async (
             statusCode: 400);
 
     // 2) Network adını pg1-dən dinamik tap
+   
+// 2) pg1-in network adlarını separator ilə əldə et
     var (netExit, netOut, netErr) = await RunProcessAsync(
         "docker",
-        "inspect pg1 --format \"{{ range $k, $v := .NetworkSettings.Networks }}{{ $k }}{{ end }}\"");
+        "inspect pg1 --format \"{{range $k, $v := .NetworkSettings.Networks}}{{$k}}|{{end}}\""
+    );
+
     if (netExit != 0)
         return Results.Json(
             new { success = false, error = $"Network aşkar edilə bilmədi: {netErr}" },
             statusCode: 500);
 
-    var networkName = netOut.Trim();
+// Network-ləri ayrı-ayrılıqda əldə et
+    var networks = netOut
+        .Split('|', StringSplitOptions.RemoveEmptyEntries |
+                    StringSplitOptions.TrimEntries)
+        .ToList();
+
+// Yalnız PostgreSQL HA network-ünü seç.
+// proxy network-ünü seçmək olmaz.
+    var networkName = networks.FirstOrDefault(
+        n => n.EndsWith("_pgnet", StringComparison.Ordinal)
+    );
+
     if (string.IsNullOrEmpty(networkName))
         return Results.Json(
-            new { success = false, error = "pg1-in network-ü yoxdur" },
+            new
+            {
+                success = false,
+                error = $"PostgreSQL HA network tapılmadı. Mövcud network-lər: {string.Join(", ", networks)}"
+            },
             statusCode: 500);
+
+    log.LogInformation("Selected HA network: {Network}", networkName);
+
 
     // 3) Volume adını pg1-dən dinamik tap
     var (volExit, volOut, volErr) = await RunProcessAsync(
