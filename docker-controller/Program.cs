@@ -56,7 +56,7 @@ app.MapPost("/internal/replicas/create", async (
 
     var (exit, output, error) = await RunProcessAsync(
         "docker-compose",
-        $"-p pg-ha-lab-step2 -f /compose/docker-compose.yml " +
+        $"-p pg-ha-lab -f /compose/docker-compose.yml " +
         $"--profile {req.Name} up -d {req.Name}");
 
     log.LogInformation("Create replica {Name}: exit={Exit}", req.Name, exit);
@@ -74,7 +74,7 @@ app.MapPost("/internal/replicas/{name}/remove", async (string name, ILogger<Prog
 
     var (exit, output, error) = await RunProcessAsync(
         "docker-compose",
-        $"-p pg-ha-lab-step2 -f /compose/docker-compose.yml rm -sf {name}");
+        $"-p pg-ha-lab -f /compose/docker-compose.yml rm -sf {name}");
 
     log.LogInformation("Remove replica {Name}: exit={Exit}", name, exit);
 
