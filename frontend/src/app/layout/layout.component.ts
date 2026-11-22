@@ -22,22 +22,36 @@ import { HeaderComponent } from './header.component';
     `
       .app-layout {
         display: flex;
-        height: 100vh;
+        width: 100%;
+        height: 100dvh;
+        min-height: 100vh;
         background: #f8fafc;
         overflow: hidden;
       }
+
+      app-sidebar {
+        display: block;
+        height: 100%;
+        flex-shrink: 0;
+      }
+
       .main-area {
         flex: 1;
         display: flex;
         flex-direction: column;
         min-width: 0;
+        min-height: 0;
         overflow: hidden;
       }
+
       .content {
         flex: 1;
+        min-height: 0;
         overflow-y: auto;
         padding: 2rem;
+        box-sizing: border-box;
       }
+
       @media (max-width: 768px) {
         .content {
           padding: 1rem;

@@ -9,13 +9,24 @@ namespace PgControl.Api.Controllers;
 [Authorize]
 public class BackupsController : ControllerBase
 {
-    private readonly PgBackRestService _pgBackRest;
+   
     private readonly PostgresMetricsService _metrics;
 
-    public BackupsController(PgBackRestService pgBackRest, PostgresMetricsService metrics)
+    private readonly PgBackRestService _pgBackRest;
+    private readonly RestoreJobService _restoreJobs;
+    private readonly IConfiguration _cfg;
+
+// Konstruktoru yenilə:
+    public BackupsController(
+        PgBackRestService pgBackRest,
+        RestoreJobService restoreJobs,
+        PostgresMetricsService metrics,
+        IConfiguration cfg)
     {
         _pgBackRest = pgBackRest;
+        _restoreJobs = restoreJobs;
         _metrics = metrics;
+        _cfg = cfg;
     }
 
     [HttpGet]
@@ -96,6 +107,92 @@ public class BackupsController : ControllerBase
             status = !isHealthy ? "critical" : (isWarning ? "warning" : "ok")
         });
     }
+
+
+// ── BACKUP YARAT ──
+public record CreateBackupReq(string Type);  // full | diff | incr
+
+[HttpPost]
+[Authorize(Roles = "Admin,Operator")]
+public async Task<IActionResult> Create([FromBody] CreateBackupReq req)
+{
+    if (req.Type is not ("full" or "diff" or "incr"))
+        return BadRequest(new { error = "Type 'full', 'diff' və ya 'incr' olmalıdır" });
+
+    // Arxa planda işə sal (uzun sürə bilər)
+    _ = Task.Run(async () =>
+    {
+        try { await _pgBackRest.CreateBackupAsync(req.Type); }
+        catch (Exception ex) { /* log */ }
+    });
+
+    return Accepted(new { message = $"Backup ({req.Type}) başladıldı. Bir neçə saniyə sonra siyahını yeniləyin." });
+}
+
+// ── VERIFY ──
+[HttpPost("verify")]
+[Authorize(Roles = "Admin,Operator")]
+public async Task<IActionResult> Verify()
+{
+    var ok = await _pgBackRest.VerifyAsync();
+    return ok ? Ok(new { message = "Backup bütövlüyü təsdiqləndi" })
+              : StatusCode(500, new { error = "Verify uğursuz" });
+}
+
+// ── PITR PREVIEW ──
+public record RestorePreviewReq(DateTime TargetTime);
+
+[HttpPost("restore/preview")]
+[Authorize(Roles = "Admin")]
+public async Task<IActionResult> PreviewRestore([FromBody] RestorePreviewReq req)
+{
+    var preview = await _pgBackRest.PreviewRestoreAsync(req.TargetTime);
+    return Ok(preview);
+}
+
+// ── PITR RESTORE (İKİ ADDIMLI TƏSDİQ) ──
+public record RestoreReq(DateTime TargetTime, string TargetAction, string Confirmation);
+
+[HttpPost("restore")]
+[Authorize(Roles = "Admin")]
+public async Task<IActionResult> Restore([FromBody] RestoreReq req)
+{
+    // 1) İki addımlı təsdiq
+    if (req.Confirmation != "RESTORE")
+        return BadRequest(new { error = "Təsdiq üçün 'RESTORE' yazın" });
+
+    // 2) Target action yoxla
+    if (req.TargetAction is not ("promote" or "pause" or "shutdown"))
+        return BadRequest(new { error = "TargetAction 'promote', 'pause' və ya 'shutdown' olmalıdır" });
+
+    // 3) Preview əvvəlcə yoxla
+    var preview = await _pgBackRest.PreviewRestoreAsync(req.TargetTime);
+    if (!preview.Valid)
+        return BadRequest(new { error = preview.Reason });
+
+    // 4) Job yarat
+    var user = User.Identity?.Name ?? "unknown";
+    var jobId = await _restoreJobs.CreateJobAsync(req.TargetTime, req.TargetAction, user);
+
+    // 5) İşə sal
+    await _restoreJobs.StartJobAsync(jobId);
+
+    return Accepted(new { jobId, message = "Bərpa başladıldı. Job statusunu izləyin." });
+}
+
+// ── JOB STATUS ──
+[HttpGet("restore/{jobId:int}")]
+[Authorize]
+public async Task<IActionResult> GetRestoreJob(int jobId)
+{
+    var job = await _restoreJobs.GetJobAsync(jobId);
+    return job == null ? NotFound() : Ok(job);
+}
+
+[HttpGet("restore")]
+[Authorize]
+public async Task<IActionResult> ListRestoreJobs()
+    => Ok(await _restoreJobs.ListJobsAsync());
 
     private static string NormalizeType(string type) =>
         type.ToLowerInvariant() switch

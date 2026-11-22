@@ -73,3 +73,50 @@ CREATE INDEX IF NOT EXISTS idx_audit_performed_at
 
 -- Flyway schema history (staging üçün)
 -- Flyway özü yaradacaq, burada yalnız qeyd
+
+-- Backup əməliyyatları (full/diff/incr)
+CREATE TABLE IF NOT EXISTS backup_jobs (
+    id              serial PRIMARY KEY,
+    backup_type     text NOT NULL,          -- full | diff | incr
+    status          text NOT NULL DEFAULT 'running',
+    -- running | completed | failed
+    started_by      text NOT NULL,
+    started_at      timestamptz NOT NULL DEFAULT now(),
+    finished_at     timestamptz,
+    label           text,                   -- pgBackRest label
+    log             text,
+    error           text
+);
+
+CREATE INDEX IF NOT EXISTS idx_backup_jobs_status ON backup_jobs(status);
+
+-- PITR restore əməliyyatları
+CREATE TABLE IF NOT EXISTS restore_jobs (
+    id              serial PRIMARY KEY,
+    backup_label    text,                   -- hansı backup-dan
+    target_time     timestamptz NOT NULL,   -- hansı ana qaytarılır
+    target_action   text NOT NULL DEFAULT 'promote',  -- promote | pause | shutdown
+    status          text NOT NULL DEFAULT 'pending',
+    -- pending | running | completed | failed | cancelled
+    requested_by    text NOT NULL,
+    requested_at    timestamptz NOT NULL DEFAULT now(),
+    confirmed_at    timestamptz,            -- iki addımlı təsdiq anı
+    started_at      timestamptz,
+    finished_at     timestamptz,
+    log             text,
+    error           text,
+    snapshot_path   text                    -- bərpadan əvvəl snapshot (əgər varsa)
+);
+
+CREATE INDEX IF NOT EXISTS idx_restore_jobs_status ON restore_jobs(status);
+
+-- Maintenance mode (klasterin hazırkı vəziyyəti)
+CREATE TABLE IF NOT EXISTS cluster_state (
+    id              int PRIMARY KEY DEFAULT 1,
+    maintenance     boolean NOT NULL DEFAULT false,
+    maintenance_reason text,
+    updated_by      text,
+    updated_at      timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT single_row CHECK (id = 1)
+);
+INSERT INTO cluster_state (id) VALUES (1) ON CONFLICT DO NOTHING;

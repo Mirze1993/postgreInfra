@@ -30,6 +30,34 @@ export interface WalArchiveStatus {
   isWarning: boolean;
 }
 
+export interface RestorePreview {
+  valid: boolean;
+  reason: string | null;
+  backupLabel: string | null;
+  backupType: string | null;
+  backupStopTime: string | null;
+  targetTime: string | null;
+  ageAfterBackup: string | null;
+  walStart: string | null;
+  walStop: string | null;
+  warning: string | null;
+}
+
+export interface RestoreJob {
+  id: number;
+  backupLabel: string | null;
+  targetTime: string;
+  targetAction: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
+  requestedBy: string;
+  requestedAt: string;
+  confirmedAt: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  log: string | null;
+  error: string | null;
+}
+
 @Injectable({ providedIn: 'root' })
 export class BackupsService {
   private auth = inject(AuthService);
@@ -51,6 +79,47 @@ export class BackupsService {
     const res = await this.client.get<WalArchiveStatus>('/backups/wal-archive', {
       headers: this.headers,
     });
+    return res.data;
+  }
+  async createBackup(type: 'full' | 'diff' | 'incr'): Promise<void> {
+    await this.client.post('/backups', { type }, { headers: this.headers });
+  }
+
+  async verify(): Promise<void> {
+    await this.client.post('/backups/verify', {}, { headers: this.headers });
+  }
+
+  async previewRestore(targetTime: string): Promise<RestorePreview> {
+    const res = await this.client.post<RestorePreview>(
+      '/backups/restore/preview',
+      { targetTime },
+      { headers: this.headers },
+    );
+    return res.data;
+  }
+
+  async startRestore(
+    targetTime: string,
+    targetAction: string,
+    confirmation: string,
+  ): Promise<{ jobId: number }> {
+    const res = await this.client.post(
+      '/backups/restore',
+      { targetTime, targetAction, confirmation },
+      { headers: this.headers },
+    );
+    return res.data;
+  }
+
+  async getRestoreJob(jobId: number): Promise<RestoreJob> {
+    const res = await this.client.get<RestoreJob>(`/backups/restore/${jobId}`, {
+      headers: this.headers,
+    });
+    return res.data;
+  }
+
+  async listRestoreJobs(): Promise<RestoreJob[]> {
+    const res = await this.client.get<RestoreJob[]>('/backups/restore', { headers: this.headers });
     return res.data;
   }
 }

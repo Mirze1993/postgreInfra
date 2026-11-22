@@ -63,7 +63,158 @@ public class PgBackRestService
             return null;
         }
     }
+public async Task<bool> CreateBackupAsync(string type, string? label = null)
+{
+    // type: full | diff | incr
+    var labelArg = string.IsNullOrEmpty(label) ? "" : $"--annotation=label:{label}";
+    var args = $"exec -u postgres {_containerName} pgbackrest --stanza={_stanza} " +
+               $"--type={type} {labelArg} backup";
 
+    var (exit, output, err) = await RunProcessAsync("docker", args);
+    _logger.LogInformation("Backup {Type}: exit={Exit}", type, exit);
+
+    if (exit != 0)
+        _logger.LogError("Backup xətası: {Err}", err);
+
+    return exit == 0;
+}
+
+public async Task<bool> VerifyAsync()
+{
+    var args = $"exec -u postgres {_containerName} pgbackrest --stanza={_stanza} verify";
+    var (exit, output, err) = await RunProcessAsync("docker", args);
+    return exit == 0;
+}
+
+/// <summary>
+/// PITR bərpa preview — heç nə etmir, yalnız mövcud backup/WAL aralığını yoxlayır.
+/// </summary>
+public async Task<RestorePreview> PreviewRestoreAsync(DateTime targetTime)
+{
+    var info = await GetInfoAsync();
+    if (info == null)
+        return new RestorePreview
+        {
+            Valid = false,
+            Reason = "pgBackRest əlçatmazdır"
+        };
+
+    var backups = info.Backups.OrderBy(b => b.Timestamp.Stop).ToList();
+    if (backups.Count == 0)
+        return new RestorePreview { Valid = false, Reason = "Heç bir backup yoxdur" };
+
+    // Verilmiş vaxt üçün ən uyğun backup-ı tap
+    var backup = backups
+        .Where(b => DateTimeOffset.FromUnixTimeSeconds(b.Timestamp.Stop).UtcDateTime <= targetTime)
+        .OrderByDescending(b => b.Timestamp.Stop)
+        .FirstOrDefault();
+
+    if (backup == null)
+        return new RestorePreview
+        {
+            Valid = false,
+            Reason = $"Bu vaxtdan ({targetTime:yyyy-MM-dd HH:mm:ss}) əvvəl backup yoxdur."
+        };
+
+    var backupStop = DateTimeOffset.FromUnixTimeSeconds(backup.Timestamp.Stop).UtcDateTime;
+    var age = targetTime - backupStop;
+
+    return new RestorePreview
+    {
+        Valid = true,
+        BackupLabel = backup.Label,
+        BackupType = backup.Type,
+        BackupStopTime = backupStop,
+        TargetTime = targetTime,
+        AgeAfterBackup = age.ToString(@"dd\.hh\:mm\:ss"),
+        WalStart = backup.Archive.Start,
+        WalStop = backup.Archive.Stop,
+        Warning = "⚠ Bu əməliyyat klasteri dayandıracaq. Bütün yazmalar dayanacaq."
+    };
+}
+
+/// <summary>
+/// PITR bərpa — ÇOX RİSKLİ. Yalnız `confirmed=true` ilə çağırılmalıdır.
+/// </summary>
+public async Task<RestoreResult> RestoreAsync(
+    DateTime targetTime, string targetAction, IProgress<string>? progress = null)
+{
+    progress?.Report("[1/6] Bərpa əməliyyatı başlayır...");
+
+    // 1) Patroni pause et (avtomatik failover söndür)
+    progress?.Report("[2/6] Patroni pause edilir...");
+    var (pauseExit, pauseOut, pauseErr) = await RunProcessAsync(
+        "docker",
+        $"exec -u postgres {_containerName} patronictl -c /etc/patroni.yml pause");
+    if (pauseExit != 0)
+        return new RestoreResult { Success = false, Error = $"Pause xətası: {pauseErr}" };
+
+    try
+    {
+        // 2) PostgreSQL dayandır
+        progress?.Report("[3/6] PostgreSQL dayandırılır...");
+        var (stopExit, _, stopErr) = await RunProcessAsync(
+            "docker",
+            $"exec -u postgres {_containerName} pg_ctl -D /var/lib/postgresql/data/pgdata stop -m fast");
+        // Bu əmr xəta qaytara bilər — Patroni artıq idarə etmirsə problem deyil
+        _logger.LogInformation("Stop: exit={Exit}", stopExit);
+
+        // 3) pgBackRest restore
+        progress?.Report($"[4/6] Bərpa edilir (target: {targetTime:yyyy-MM-dd HH:mm:ss UTC})...");
+        var targetStr = targetTime.ToUniversalTime().ToString("yyyy-MM-dd HH:mm:ss.fff") + "+00";
+        var restoreArgs = $"exec -u postgres {_containerName} " +
+            $"pgbackrest --stanza={_stanza} --delta --type=time " +
+            $"--target=\"{targetStr}\" --target-action={targetAction} " +
+            $"--pg1-path=/var/lib/postgresql/data/pgdata restore";
+
+        var (restoreExit, restoreOut, restoreErr) = await RunProcessAsync("docker", restoreArgs);
+
+        if (restoreExit != 0)
+        {
+            progress?.Report($"❌ Bərpa uğursuz: {restoreErr}");
+            return new RestoreResult
+            {
+                Success = false,
+                Error = restoreErr,
+                Log = restoreOut
+            };
+        }
+
+        // 4) PostgreSQL başlat
+        progress?.Report("[5/6] PostgreSQL başladılır...");
+        var (startExit, _, startErr) = await RunProcessAsync(
+            "docker",
+            $"exec -u postgres {_containerName} pg_ctl -D /var/lib/postgresql/data/pgdata -l /tmp/restore-startup.log start");
+
+        // 5) Patroni resume
+        progress?.Report("[6/6] Patroni resume edilir...");
+        var (resumeExit, resumeOut, resumeErr) = await RunProcessAsync(
+            "docker",
+            $"exec -u postgres {_containerName} patronictl -c /etc/patroni.yml resume");
+
+        progress?.Report("✅ Bərpa tamamlandı");
+
+        return new RestoreResult
+        {
+            Success = true,
+            Log = restoreOut,
+            TargetTime = targetTime
+        };
+    }
+    catch (Exception ex)
+    {
+        _logger.LogError(ex, "Restore xətası");
+        // Hər halda Patroni resume etməyə çalış
+        try
+        {
+            await RunProcessAsync("docker",
+                $"exec -u postgres {_containerName} patronictl -c /etc/patroni.yml resume");
+        }
+        catch { /* ignore */ }
+
+        return new RestoreResult { Success = false, Error = ex.Message };
+    }
+}
     private static async Task<(int ExitCode, string Output, string Error)> RunProcessAsync(
         string fileName, string arguments)
     {
@@ -242,4 +393,25 @@ public class PgBackRestArchive
 
     [JsonPropertyName("max")]
     public string Max { get; set; } = "";
+}
+public class RestorePreview
+{
+    public bool Valid { get; set; }
+    public string? Reason { get; set; }
+    public string? BackupLabel { get; set; }
+    public string? BackupType { get; set; }
+    public DateTime? BackupStopTime { get; set; }
+    public DateTime? TargetTime { get; set; }
+    public string? AgeAfterBackup { get; set; }
+    public string? WalStart { get; set; }
+    public string? WalStop { get; set; }
+    public string? Warning { get; set; }
+}
+
+public class RestoreResult
+{
+    public bool Success { get; set; }
+    public string? Error { get; set; }
+    public string? Log { get; set; }
+    public DateTime? TargetTime { get; set; }
 }

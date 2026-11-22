@@ -54,120 +54,33 @@ import { AuthService } from '../core/auth.service';
     `
       .header {
         height: 64px;
+        min-height: 64px;
         background: #fff;
         border-bottom: 1px solid #e2e8f0;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        padding: 0 2rem;
+        padding: 0 1.5rem;
         flex-shrink: 0;
+        box-sizing: border-box;
       }
-      .page-title {
-        margin: 0;
-        font-size: 1.1rem;
-        color: #0f172a;
-        font-weight: 600;
-      }
-      .breadcrumb {
-        font-size: 0.75rem;
-        color: #94a3b8;
-        margin-top: 0.15rem;
-      }
-      .breadcrumb span {
-        color: #475569;
-      }
-      .right {
-        display: flex;
-        align-items: center;
-        gap: 1.5rem;
-      }
-      .status-indicator {
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-        font-size: 0.8rem;
-        color: #475569;
-        padding: 0.35rem 0.75rem;
-        background: #f8fafc;
-        border-radius: 20px;
-      }
-      .dot {
-        width: 8px;
-        height: 8px;
-        border-radius: 50%;
-        background: #94a3b8;
-      }
-      .dot.online {
-        background: #16a34a;
-        box-shadow: 0 0 0 3px #dcfce7;
-      }
-      .user-menu {
-        position: relative;
-      }
-      .user-btn {
-        display: flex;
-        align-items: center;
-        gap: 0.75rem;
-        background: transparent;
-        border: 0;
-        cursor: pointer;
-        padding: 0.4rem 0.75rem;
-        border-radius: 8px;
-      }
-      .user-btn:hover {
-        background: #f1f5f9;
-      }
-      .avatar {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        background: linear-gradient(135deg, #3b82f6, #6366f1);
-        color: #fff;
-        display: grid;
-        place-items: center;
-        font-weight: 600;
-        font-size: 0.85rem;
-      }
-      .user-info {
-        text-align: left;
-      }
-      .user-info .name {
-        font-size: 0.85rem;
-        font-weight: 500;
-        color: #0f172a;
-      }
-      .user-info .role {
-        font-size: 0.7rem;
-        color: #64748b;
-      }
-      .dropdown {
-        position: absolute;
-        right: 0;
-        top: calc(100% + 0.5rem);
-        background: #fff;
-        border: 1px solid #e2e8f0;
-        border-radius: 8px;
-        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        min-width: 160px;
-        padding: 0.25rem;
-        z-index: 10;
-      }
-      .dropdown button {
-        width: 100%;
-        text-align: left;
-        padding: 0.5rem 0.75rem;
-        background: transparent;
-        border: 0;
-        cursor: pointer;
-        border-radius: 4px;
-        font-size: 0.85rem;
-        color: #dc2626;
-        display: flex;
-        align-items: center;
-        gap: 0.5rem;
-      }
-      .dropdown button:hover {
-        background: #fef2f2;
+
+      @media (max-width: 768px) {
+        .header {
+          padding: 0 0.75rem;
+        }
+
+        .status-indicator {
+          display: none;
+        }
+
+        .user-info {
+          display: none;
+        }
+
+        .right {
+          gap: 0.5rem;
+        }
       }
     `,
   ],
