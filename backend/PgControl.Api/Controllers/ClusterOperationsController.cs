@@ -48,17 +48,30 @@ public class ClusterOperationsController : ControllerBase
 
     [HttpPost("replicas/remove")]
     [Authorize(Roles = "Admin")]
-    public async Task<IActionResult> RemoveReplica([FromBody] RemoveReplicaReq req)
+    public async Task<IActionResult> RemoveReplica(
+        [FromBody] RemoveReplicaReq req)
     {
+        if (string.IsNullOrWhiteSpace(req.NodeName))
+            return BadRequest(new { error = "NodeName tələb olunur" });
+
         if (req.Confirmation != "REMOVE")
             return BadRequest(new { error = "Təsdiq üçün 'REMOVE' yazın" });
 
+        if (!System.Text.RegularExpressions.Regex.IsMatch(
+                req.NodeName, @"^pg[0-9]+$"))
+            return BadRequest(new { error = "Yanlış node adı" });
+
         try
         {
-            var id = await _svc.RequestRemoveReplicaAsync(req.NodeName, CurrentUser);
+            var id = await _svc.RequestRemoveReplicaAsync(
+                req.NodeName, CurrentUser);
+
             return Accepted(new { operationId = id });
         }
-        catch (InvalidOperationException ex) { return BadRequest(new { error = ex.Message }); }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
     }
 
     // ── SWITCHOVER ───────────────────────────────────────
